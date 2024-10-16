@@ -5,7 +5,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.client.WebClient;
 import pe.edu.cibertec.patitas_frontend_wc.dto.LoginRequestDTO;
 import pe.edu.cibertec.patitas_frontend_wc.dto.LoginResponseDTO;
+import pe.edu.cibertec.patitas_frontend_wc.dto.LogoutRequestDTO;
+import pe.edu.cibertec.patitas_frontend_wc.dto.LogoutResponseDTO;
 import reactor.core.publisher.Mono;
+
+import java.util.Arrays;
 
 @RestController
 @RequestMapping("/login")
@@ -17,7 +21,6 @@ public class LoginControllerAsync {
 
     @PostMapping("/autenticar-async")
     public Mono<LoginResponseDTO> autenticar(@RequestBody LoginRequestDTO loginRequestDTO) {
-
         // validar campos de entrada
         if (loginRequestDTO.tipoDocumento() == null || loginRequestDTO.tipoDocumento().trim().length() == 0 ||
                 loginRequestDTO.numeroDocumento() == null || loginRequestDTO.numeroDocumento().trim().length() == 0 ||
@@ -26,30 +29,46 @@ public class LoginControllerAsync {
         }
 
         try {
-
             // consumir servicio backend de autenticacion
-            return webClientAutenticacion.post()
+            return webClientAutenticacion
+                    .post()
                     .uri("/login")
                     .body(Mono.just(loginRequestDTO), LoginRequestDTO.class)
                     .retrieve()
                     .bodyToMono(LoginResponseDTO.class)
                     .flatMap(response -> {
-
-                        if(response.codigo().equals("00")){
-                            return Mono.just(new LoginResponseDTO("00", "", response.nombreUsuario(), ""));
-                        } else {
+                        if(response.codigo().equals("00"))
+                            return Mono.just(new LoginResponseDTO("00", "", response.nombreUsuario(), response.correoUsuario()));
+                        else
                             return Mono.just(new LoginResponseDTO("02", "Error: Autenticación fallida", "", ""));
-                        }
-
                     });
-
         } catch(Exception e) {
-
             System.out.println(e.getMessage());
             return Mono.just(new LoginResponseDTO("99", "Error: Ocurrió un problema en la autenticación", "", ""));
-
         }
-
     }
 
+    @PostMapping("/salir-async")
+    public Mono<LogoutResponseDTO> salir(@RequestBody LogoutRequestDTO logoutRequestDTO) {
+        try {
+            return webClientAutenticacion.post()
+                    .uri("/logout")
+                    .body(Mono.just(logoutRequestDTO), LogoutRequestDTO.class)
+                    .retrieve()
+                    .bodyToMono(LogoutResponseDTO.class)
+                    .flatMap(response -> {
+                        System.out.println(response.fecha());
+                        System.out.println(response.resultado());
+                        System.out.println(response.mensajeError());
+
+                        if(response.resultado())
+                            return Mono.just(new LogoutResponseDTO(true, response.fecha(), ""));
+                        else
+                            return Mono.just(new LogoutResponseDTO(false, null, response.mensajeError()));
+                    });
+        } catch (Exception e) {
+            System.out.println(e.getMessage());
+            return Mono.just(new LogoutResponseDTO(false, null, "Error: Ocurrió un problema."));
+        }
+    }
 }
